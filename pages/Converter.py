@@ -72,7 +72,7 @@ if st.button("Process your profiles", type="primary"):
 
     if PROT_SET is not None:
         with open(
-                '/home/ministreliya131/PycharmProjects/PMInteractor/protein_dictionary_hmdb.csv'
+                'pages/protein_dictionary_hmdb.csv'
         ) as p_d:
             for line in p_d:
                 line_strip = line.strip()
@@ -137,7 +137,7 @@ if st.button("Process your profiles", type="primary"):
                         cols = [ele.text.strip() for ele in cols]
                         mdata.append([ele for ele in cols if ele])
 
-                    with open("/home/ministreliya131/PycharmProjects/PMInteractor/tmp", "a") as f:
+                    with open("pages/tmp", "a") as f:
                         for i in mdata:
                             print(p_hmdb, i[2], i[3], sep=",", file=f)
 
@@ -148,13 +148,13 @@ if st.button("Process your profiles", type="primary"):
         end_time = time.time() - start_time
         st.write(f"Finished search with {round(end_time / 60, 2)} minutes!")
 
-        met_dict = pd.read_csv("/home/ministreliya131/PycharmProjects/PMInteractor/tmp", sep=",", header=None)
+        met_dict = pd.read_csv("pages/tmp", sep=",", header=None)
         met_dict_g = met_dict.groupby(by=0, as_index=False)[1].agg("|".join)
         met_dict_g.to_csv("metabolome_to_proteome_dictionary.csv", index=False, header=None)
 
         assoc_prot = set()
         with open("associated_proteome.csv", "w") as f4:
-            with open("/home/ministreliya131/PycharmProjects/PMInteractor/tmp") as f:
+            with open("pages/tmp") as f:
                 for line in f:
                     line_s = line.strip().split(",")
                     assoc_prot.add(line_s[1])
