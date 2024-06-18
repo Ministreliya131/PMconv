@@ -28,11 +28,11 @@ def append_row(df, row):
            ).reset_index(drop=True)
 
 
-st.write("# Welcome to PMInteractor!")
+st.write("# Welcome to PMconv!")
 
 st.markdown(
     """
-        ## PMInteractor is an open-source app for proteometabolomics
+        ## PMconv is an open-source app for proteometabolomics
     """
 )
 
