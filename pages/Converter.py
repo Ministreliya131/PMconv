@@ -32,7 +32,7 @@ st.write("# Welcome to PMInteractor!")
 
 st.markdown(
     """
-        ## PMInteractor is an open-source app framework built for proteometabolomics analyses
+        ## PMInteractor is an open-source app for proteometabolomics
     """
 )
 
