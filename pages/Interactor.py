@@ -26,12 +26,12 @@ def get_key_by_value(dict, search):
 
 st.write("# Welcome to PMInteractor!")
 
-with open("/home/ministreliya131/PycharmProjects/PMInteractor/gene_prot_dict.tsv") as ff:
+with open("pages/gene_prot_dict.tsv") as ff:
     for line in ff:
         l_s = line.strip().split("\t")
         prot_gene_dict.update({l_s[0]: l_s[1]})
 
-with open("/home/ministreliya131/PycharmProjects/PMInteractor/proteome_to_metabolome_dictionary.csv") as pm:
+with open("pages/proteome_to_metabolome_dictionary.csv") as pm:
     for line in pm:
         ll = line.strip().split(",")
         PROT_LIST.append(ll[0])
@@ -39,7 +39,7 @@ with open("/home/ministreliya131/PycharmProjects/PMInteractor/proteome_to_metabo
             for j in ll[1].split("|"):
                 ASSOC_MET_LIST.append(j)
 
-with open("/home/ministreliya131/PycharmProjects/PMInteractor/metabolome_to_proteome_dictionary.csv") as mp:
+with open("pages/metabolome_to_proteome_dictionary.csv") as mp:
     for line in mp:
         ll = line.strip().split(",")
         MET_LIST.append(ll[0])
@@ -131,7 +131,7 @@ response_2 = requests.post(request_url_2, data=params_2)
 # st.write("got response")
 
 met_prot_inter = pd.DataFrame(columns=['Source', 'Target', 'Score'])
-met_prot_d = pd.read_csv("/home/ministreliya131/PycharmProjects/PMInteractor/proteome_to_metabolome_dictionary.csv",
+met_prot_d = pd.read_csv("pages/proteome_to_metabolome_dictionary.csv",
                          sep=",", header=None)
 for index, line in met_prot_d.iterrows():
     if line[0] in PROT_LIST:
