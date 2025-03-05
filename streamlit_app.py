@@ -1,17 +1,9 @@
 import streamlit as st
-import aiohttp
-import asyncio
-import time
 import pandas as pd
-import matplotlib.pyplot as plt
-from venn import venn
-import os
-from bs4 import BeautifulSoup
-import requests
-import networkx as nx
-import plotly.graph_objs as go
-from PIL import Image
-from streamlit_agraph import agraph, Node, Edge, Config
+# import numpy as np
+# import matplotlib.pyplot as plt
+# from venn import venn
+
 
 prot_dict = {}
 prot_gene_dict = {}
@@ -28,11 +20,11 @@ def append_row(df, row):
            ).reset_index(drop=True)
 
 
-st.write("# Welcome to PMconv!")
+st.write("# Welcome to PMInteractor!")
 
 st.markdown(
     """
-        ## PMconv is an open-source app for proteometabolomics
+        ## PMInteractor is an open-source app framework built for proteometabolomics analyses
     """
 )
 
@@ -60,6 +52,11 @@ with st.sidebar:
             st.write(len(PROT_SET))
 
     metabolites = st.text_area("Your metabolite list (one metabolite per line)")
+    #filters = st.multiselect("Select filters", options=["Brutto", "Mol_weight", "Class", "Subclass", "Ref", "Proteins", "Origin"], default='Brutto')
+    apply_filter = st.checkbox("Group by brutto formulas")
+    ref_filter = st.text_input("Number of references threshold", value=0)
+    nprot_filter = st.text_input("Number of associated proteins threshold", value=0)
+    origin_filter = st.text_input("Origin", value="Endogenous")
     st.button("Submit", disabled=not metabolites, key="metabolite")
 
     if metabolites is not None:
@@ -72,7 +69,7 @@ if st.button("Process your profiles", type="primary"):
 
     if PROT_SET is not None:
         with open(
-                'pages/protein_dictionary_hmdb.csv'
+                '/home/ministreliya131/PycharmProjects/PMInteractor/protein_dictionary_hmdb.csv'
         ) as p_d:
             for line in p_d:
                 line_strip = line.strip()
@@ -88,7 +85,7 @@ if st.button("Process your profiles", type="primary"):
 
         assoc_met = []
 
-        with open("proteome_to_metabolome_dictionary.csv", "w") as f2:
+        with open("associated_metabolome_dictionary.csv", "w") as f2:
             for p in PROT_SET:
                 if p in prot_dict:
                     assoc_met += prot_dict[p]
@@ -108,58 +105,42 @@ if st.button("Process your profiles", type="primary"):
         st.write("No proteome profile was given")
 
     if MET_SET is not None:
-        start_time = time.time()
+        hmdb = pd.read_csv('/home/ministreliya131/PycharmProjects/PMInteractor/metabolite_dictionary_hmdb.csv', sep=";")
 
-
-        async def get_task():
-            tasks = []
-            async with aiohttp.ClientSession() as session:
-                for p_hmdb in MET_SET:
-                    task = asyncio.create_task(get_prot_and_gene(session, p_hmdb))
-                    tasks.append(task)
-                    await asyncio.sleep(1)
-                await asyncio.gather(*tasks)
-
-
-        async def get_prot_and_gene(session, p_hmdb):
-            url = f"https://hmdb.ca/metabolites/{p_hmdb}/metabolite_protein_links"
-            async with session.get(url) as response:
-                if response.status == 200:
-                    soup = BeautifulSoup(await response.text(), "html.parser")
-
-                    mdata = []
-                    table = soup.find('table', attrs={"class": "table table-condensed"
-                                                               " table-striped metabolite-protein-links proteins"})
-                    table_body = table.find('tbody')
-                    rows = table_body.find_all('tr')
-                    for row in rows:
-                        cols = row.find_all('td')
-                        cols = [ele.text.strip() for ele in cols]
-                        mdata.append([ele for ele in cols if ele])
-
-                    with open("pages/tmp", "a") as f:
-                        for i in mdata:
-                            print(p_hmdb, i[2], i[3], sep=",", file=f)
-
+        met_set_df = pd.DataFrame({"Metabolite set input": list(MET_SET)})
+        hmdb_met_set = pd.merge(hmdb, met_set_df,
+                                left_on="Id", right_on="Metabolite set input", how="inner")
 
         st.write("Processing metabolome profile...")
 
-        asyncio.run(get_task())
-        end_time = time.time() - start_time
-        st.write(f"Finished search with {round(end_time / 60, 2)} minutes!")
+        if apply_filter:
+            hmdb_met_set["Proteins list"] = hmdb_met_set["Proteins list"].astype(str)
+            met_dict_b = hmdb_met_set.groupby(by="Brutto", as_index=False)["Proteins list"].agg("|".join)
+            met_dict = pd.merge(hmdb_met_set, met_dict_b, left_on="Brutto", right_on="Brutto", how="inner", suffixes=("", "_y"))
+            #st.table(met_dict.head(6))
+            met_dict = met_dict[met_dict["Ref"] >= int(ref_filter)]
+            met_dict = met_dict[met_dict["Proteins"] >= int(nprot_filter)]
+            met_dict = met_dict[met_dict["Origin"] == origin_filter]
+            met_dict = met_dict[["Brutto", "Proteins list"]]
+            met_dict.to_csv("associated_proteome_dictionary.csv", index=False)
+        else:
+            met_dict = hmdb_met_set[hmdb_met_set["Ref"] >= int(ref_filter)]
+            met_dict = met_dict[met_dict["Proteins"] >= int(nprot_filter)]
+            met_dict = met_dict[met_dict["Origin"] == origin_filter]
+            met_dict = met_dict[["Id", "Proteins list"]]
+            met_dict.to_csv("associated_proteome_dictionary.csv", index=False)
 
-        met_dict = pd.read_csv("pages/tmp", sep=",", header=None)
-        met_dict_g = met_dict.groupby(by=0, as_index=False)[1].agg("|".join)
-        met_dict_g.to_csv("metabolome_to_proteome_dictionary.csv", index=False, header=None)
 
         assoc_prot = set()
         with open("associated_proteome.csv", "w") as f4:
-            with open("pages/tmp") as f:
-                for line in f:
-                    line_s = line.strip().split(",")
-                    assoc_prot.add(line_s[1])
-                    prot_gene_dict.update({line_s[1]: line_s[2]})
-                    print(line_s[1], file=f4)
+            for line in met_dict["Proteins list"]:
+                if type(line) == float:
+                    #st.write(line)
+                    pass
+                else:
+                    line_s = line.split("|")
+                    for p in line_s:
+                        assoc_prot.add(p)
 
         ASSOC_PROT_SET = assoc_prot
 
@@ -177,13 +158,7 @@ col1, col2 = st.columns([1.5, 1.5])
 
 if ASSOC_MET_SET and ASSOC_PROT_SET is not None:
     with col1:
-        st.subheader("Metabolome vs Metabolome*")
-        dict_venn_met = {"Metabolome": set(MET_SET), "Metabolome*": set(ASSOC_MET_SET)}
-        cmap_format = ["#00BFFF", "#7B68EE"]
-        venn(dict_venn_met, cmap=cmap_format, fontsize=20, figsize=(8, 8))
-        st.pyplot(plt)
-
-        prot_df = pd.read_csv("proteome_to_metabolome_dictionary.csv", sep=",", header=None)
+        prot_df = pd.read_csv("associated_metabolome_dictionary.csv", sep=",", header=None)
         prot_df.rename(columns={0: "Uniprot ID",
                                 1: "Associated metabolites"}, inplace=True)
         prot_df_single = prot_df[prot_df["Associated metabolites"].isna()]
@@ -196,17 +171,11 @@ if ASSOC_MET_SET and ASSOC_PROT_SET is not None:
         st.table(prot_df_multi_sort[["Uniprot ID", "Metabolite count"]].head(6))
 
     with col2:
-        st.subheader("Proteome vs Proteome*")
-        dict_venn_prot = {"Proteome": set(PROT_SET), "Proteome*": set(ASSOC_PROT_SET)}
-        cmap_format = ["#DC143C", "#800000"]
-        venn(dict_venn_prot, cmap=cmap_format, fontsize=20, figsize=(8, 8))
-        st.pyplot(plt)
-
-        met_df = pd.read_csv("metabolome_to_proteome_dictionary.csv", sep=",", header=None)
+        met_df = pd.read_csv("associated_proteome_dictionary.csv", sep=",", header=None)
         met_df.rename(columns={0: "HMDB ID",
                                1: "Associated proteins"}, inplace=True)
 
-        met_df["Protein count"] = met_df["Associated proteins"].apply(lambda x: len(x.split("|")))
+        met_df["Protein count"] = met_df["Associated proteins"].apply(lambda x: 0 if type(x) == float else len(x.split("|")))
         met_df_sort = met_df.sort_values(by="Protein count", ascending=False)
 
         st.write(f"##### {len(MET_SET - set(met_df['HMDB ID'].to_list()))} metabolites have no associations")
