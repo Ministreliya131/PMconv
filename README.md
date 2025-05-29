@@ -1,5 +1,9 @@
 # PMconv: Proteometabolomic Network Analysis Tool
 
+<p align="center">
+  <img src="https://github.com/Ministreliya131/PMconv/raw/main/data/pmconv.png" alt="PMconv Logo" width="300"/>
+</p>
+
 ## Overview
 PMconv is a web-based application that enables bidirectional conversion between protein and metabolite identifiers based on shared metabolic pathways. The tool facilitates:
 
