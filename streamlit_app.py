@@ -121,6 +121,7 @@ with col1:
     if df_prot is not None:
         prot_set = set(df_prot["Uniprot IDs"].to_list())
         p_dict_hmdb = os.path.join(os.path.dirname(__file__), 'data', 'protein_dictionary_hmdb.csv')
+        p_dict_loc = os.path.join(os.path.dirname(__file__), 'data', 'proteins_localization_HPA.tsv')
         with open(p_dict_hmdb) as p_d:
             for line in p_d:
                 line_strip = line.strip()
@@ -142,7 +143,13 @@ with col1:
                 new_row = pd.Series({"Uniprot": p, "Metabolites list": "None"})
             assoc_met_dict_df = append_row(assoc_met_dict_df, new_row)
 
-        assoc_met_dict_csv = assoc_met_dict_df.to_csv(index=False).encode("utf-8")
+        p_dict_loc_df = pd.read_csv(p_dict_loc, sep="\t")
+        assoc_met_dict_df_loc = pd.merge(assoc_met_dict_df, p_dict_loc_df, 
+                                         left_on="Uniprot", right_on="Entry",
+                                         how="left")
+        assoc_met_dict_df_loc_f = assoc_met_dict_df_loc[["Uniprot", "Secretome location",
+                                                         "Subcellular main location", "Metabolites list"]]
+        assoc_met_dict_csv = assoc_met_dict_df_loc_f.to_csv(sep=";", index=False).encode("utf-8")
         st.download_button(
             label="📥 Download metabolome* as CSV",
             data=assoc_met_dict_csv,
@@ -156,6 +163,8 @@ with col1:
 
     if df_met is not None:
         hmdb_data = os.path.join(os.path.dirname(__file__), 'data', 'metabolite_dictionary_hmdb.csv')
+        p_dict_loc = os.path.join(os.path.dirname(__file__), 'data', 'proteins_localization_HPA.tsv')
+        p_dict_loc_df = pd.read_csv(p_dict_loc, sep="\t")
         hmdb = pd.read_csv(hmdb_data, sep=";")
         hmdb_met_set = pd.merge(hmdb, df_met,
                                 left_on="Id", right_on="HMDB IDs", how="inner")
@@ -172,18 +181,58 @@ with col1:
             met_dict = met_dict[met_dict["Proteins"] >= int(nprot_filter)]
             met_dict = met_dict[met_dict["Origin"] == origin_filter]
             met_dict = met_dict[["Brutto", "Proteins list"]]
-            met_dict_csv = met_dict.to_csv(index=False).encode("utf-8")
+            met_dict_csv = met_dict.to_csv(sep=";", index=False).encode("utf-8")
+
+            assoc_p_l = []
+            for i in met_dict["Proteins list"].astype(str):
+                if len(i.split("|")) > 1:
+                    for j in i.split("|"):
+                        assoc_p_l.append(j)
+                else:
+                    assoc_p_l.append(i)
+
+            met_dict_prot_df = pd.DataFrame({"Uniprot": assoc_p_l})
+            prot_asoc_loc = pd.merge(p_dict_loc_df, met_dict_prot_df,
+                                     left_on="Entry", right_on="Uniprot",
+                                     how="right")
+            prot_asoc_loc_f = prot_asoc_loc[["Uniprot", "Secretome location",
+                                                         "Subcellular main location"]]
+            prot_asoc_loc_csv = prot_asoc_loc_f.to_csv(sep=";", index=False).encode("utf-8")
+            
         else:
             met_dict = hmdb_met_set[hmdb_met_set["Ref"] >= int(ref_filter)]
             met_dict = met_dict[met_dict["Proteins"] >= int(nprot_filter)]
             met_dict = met_dict[met_dict["Origin"] == origin_filter]
             met_dict = met_dict[["Id", "Proteins list"]]
-            met_dict_csv = met_dict.to_csv(index=False).encode("utf-8")
+            met_dict_csv = met_dict.to_csv(sep=";", index=False).encode("utf-8")
+
+            assoc_p_l = []
+            for i in met_dict["Proteins list"].astype(str):
+                if len(i.split("|")) > 1:
+                    for j in i.split("|"):
+                        assoc_p_l.append(j)
+                else:
+                    assoc_p_l.append(i)
+
+            met_dict_prot_df = pd.DataFrame({"Uniprot": assoc_p_l})
+            prot_asoc_loc = pd.merge(p_dict_loc_df, met_dict_prot_df,
+                                     left_on="Entry", right_on="Uniprot",
+                                     how="right")
+            prot_asoc_loc_f = prot_asoc_loc[["Uniprot", "Secretome location",
+                                                         "Subcellular main location"]]
+            prot_asoc_loc_csv = prot_asoc_loc_f.to_csv(sep=";", index=False).encode("utf-8")
 
         st.download_button(
             label="📥 Download proteome* as CSV",
             data=met_dict_csv,
             file_name="associated_proteome_dictionary.csv",
+            mime="text/csv"
+        )
+
+        st.download_button(
+            label="📥 Download proteome* proteins localization as CSV",
+            data=prot_asoc_loc_csv,
+            file_name="associated_proteome_dictionary_localization.csv",
             mime="text/csv"
         )
 
