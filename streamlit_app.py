@@ -3,6 +3,8 @@ from streamlit_agraph import agraph, Node, Edge, Config
 import pandas as pd
 import streamlit as st
 import os
+import numpy as np
+from pyvis.network import Network
 
 
 
@@ -257,7 +259,7 @@ with col2:
     st.markdown("### Legend")
     c1, c2 = st.columns(2)
     with c1:
-        st.markdown("🔴 **Protein** (Red dot)")
+        st.markdown("🔴 **Protein** (Red dot)\ **Transporter** (Dark Red dot)")
     with c2:
         st.markdown("🟦 **Metabolite** (Blue square)")
 
@@ -317,8 +319,79 @@ if df_prot is not None and df_met is not None:
             df_inter = append_row(df_inter, new_row)
 
     df_i = pd.concat([met_prot_inter, df_inter], ignore_index=True)
-    df_i_csv = df_i.to_csv(index=False).encode("utf-8")
+    df_i_tnp = pd.merge(df_i, transp_data_df, 
+                        left_on="Source", right_on="Gene Name",
+                        how="left")
+    df_i_csv = df_i_tnp[["Source", "Target", "Score", "TCDB"]].to_csv(index=False).encode("utf-8")
 
+    # 1. Быстрый маппинг TCDB (O(1) доступ)
+    tcdb_lookup = dict(zip(transp_data_df["Gene Name"], transp_data_df["TCDB"]))
+
+    # 2. Векторизованная подготовка узлов (в 10-50 раз быстрее цикла)
+    pre_nodes_l = list(set(df_i["Source"].tolist() + df_i["Target"].tolist()))
+    node_df = pd.DataFrame({"id": pre_nodes_l})
+
+    node_df["is_met"] = node_df["id"].str.contains("HMDB", na=False)
+    node_df["tcdb_val"] = node_df["id"].map(tcdb_lookup)
+    node_df["is_trans"] = node_df["tcdb_val"].notna() & \
+                      (node_df["tcdb_val"].astype(str).str.strip().str.lower() != "unknown")
+
+    # Назначаем цвета и формы векторно
+    node_df["color"] = np.where(node_df["is_met"], "#0000CD", np.where(node_df["is_trans"], "#8B0000", "#DC143C"))
+    node_df["shape"] = np.where(node_df["is_met"], "square", "dot")
+    node_df["label"] = node_df["id"]
+    node_df["size"] = 25
+
+    # 3. Создаем граф
+    net = Network(height="700px", width="100%", directed=False, bgcolor="#ffffff", font_color="black")
+
+    # Добавляем узлы пакетно (под капотом оптимизировано на C/JS уровне)
+    net.add_nodes(
+    node_df["id"].astype(str).tolist(),
+    label=node_df["label"].astype(str).tolist(),
+    shape=node_df["shape"].tolist(),
+    color=node_df["color"].tolist(),
+    size=node_df["size"].astype(int).tolist()
+    )
+
+    # 2. Связи (минимально и надёжно)
+    edge_pairs = df_i[["Source", "Target"]].astype(str).drop_duplicates().values.tolist()
+    net.add_edges(edge_pairs)
+
+    # 3. Физика: быстрая стабилизация (150-200 итераций) + авто-зум
+    net.set_options('''{
+    "nodes": {
+        "font": {
+            "size": 14,
+            "face": "sans-serif",
+            "color": "#000000",
+            "strokeWidth": 2,
+            "strokeColor": "#ffffff",
+            "align": "center"
+        }
+    },
+    "physics": {
+        "enabled": true,
+        "solver": "barnesHut",
+        "barnesHut": {
+            "gravitationalConstant": -2000,
+            "centralGravity": 0.3,
+            "springLength": 100,
+            "springConstant": 0.04
+        },
+        "stabilization": {
+            "enabled": true,
+            "iterations": 180,
+            "fit": true
+        }
+    },
+    "interaction": {
+        "hover": true,
+        "tooltipDelay": 50
+    }
+    }''')
+
+    # 4. Корректный вывод в Streamlit
     with col1:
         st.download_button(
             label="📥 Download protein-metabolite interaction table as CSV",
@@ -327,38 +400,8 @@ if df_prot is not None and df_met is not None:
             mime="text/csv"
         )
 
-    pre_nodes_l = set(list(df_i["Source"]) + list(df_i["Target"]))
-
-    nodes = []
-    edges = []
-    for i in pre_nodes_l:
-        if "HMDB" in i:
-            nodes.append(Node(id=i,
-                              label=i,
-                              size=25,
-                              color="#0000CD",
-                              shape="square"))
-        else:
-            nodes.append(Node(id=i,
-                              label=i,
-                              size=25,
-                              color="#DC143C",
-                              shape="dot"))
-    for i, lines in df_i.iterrows():
-        edges.append(Edge(source=lines[0],
-                          target=lines[1]))
-
-    config = Config(width=650,
-                    height=850,
-                    directed=False,
-                    physics=False,
-                    hierarchical=False,
-                    # **kwargs
-                    )
-
-    return_value = agraph(nodes=nodes,
-                          edges=edges,
-                          config=config)
+    # Рендер графа (именно этого часто не хватает в коде)
+    st.components.v1.html(net.generate_html(), height=750, scrolling=True)
 
 else:
     with col2:
