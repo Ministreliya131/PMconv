@@ -264,7 +264,8 @@ with col2:
 
 if df_prot is not None and df_met is not None:
 
-    transp_data = os.path.join(os.path.dirname(__file__), 'data', 'metabolite_dictionary_hmdb.csv'
+    transp_data = os.path.join(os.path.dirname(__file__), 'data', 'proteins_transporters_SP.tsv')
+    transp_data_df = pd.read_csv(transp_data, sep="\t")
 
     gene_to_string = []
     err_lst = []
