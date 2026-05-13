@@ -263,6 +263,9 @@ with col2:
 
 
 if df_prot is not None and df_met is not None:
+
+    transp_data = os.path.join(os.path.dirname(__file__), 'data', 'metabolite_dictionary_hmdb.csv'
+
     gene_to_string = []
     err_lst = []
     protlist = list(set(df_prot["Uniprot IDs"].to_list()))
